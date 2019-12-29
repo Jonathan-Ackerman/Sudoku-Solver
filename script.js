@@ -19,6 +19,18 @@ let testGrid = [
     [0, 0, 8, 0, 0, 0, 0, 6, 0]
 ];
 
+let testGrid2 = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 8],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 8, 0, 0, 0, 0, 0, 0]
+];
+
 let easyGrid = [
     [0, 2, 0, 3, 0, 0, 5, 8, 0],
     [0, 0, 4, 5, 0, 7, 0, 1, 0],
@@ -29,7 +41,44 @@ let easyGrid = [
     [1, 6, 0, 0, 0, 8, 0, 2, 3],
     [0, 7, 0, 2, 0, 6, 0, 0, 0],
     [2, 3, 0, 0, 0, 0, 8, 7, 6]
-]
+];
+
+let mediumGrid = [
+    [0, 0, 0, 0, 8, 0, 0, 0, 0],
+    [0, 0, 3, 0, 0, 0, 0, 0, 0],
+    [0, 2, 1, 0, 0, 5, 0, 4, 0],
+    [0, 0, 8, 0, 0, 0, 2, 6, 0],
+    [9, 0, 0, 3, 2, 0, 4, 5, 0],
+    [0, 5, 0, 0, 0, 0, 0, 0, 9],
+    [0, 0, 4, 6, 0, 1, 7, 0, 0],
+    [0, 0, 0, 0, 0, 9, 0, 0, 0],
+    [0, 3, 0, 7, 0, 0, 8, 0, 0]
+];
+
+let hardGrid = [
+    [0, 5, 0, 0, 0, 0, 4, 0, 0],
+    [1, 6, 0, 8, 0, 0, 7, 0, 5],
+    [4, 0, 0, 0, 0, 0, 0, 2, 6],
+    [0, 4, 9, 0, 0, 0, 0, 0, 0],
+    [8, 0, 5, 6, 0, 0, 0, 0, 1],
+    [0, 0, 0, 0, 0, 0, 8, 7, 0],
+    [0, 0, 0, 3, 9, 0, 0, 6, 4],
+    [0, 0, 0, 0, 0, 6, 0, 1, 0],
+    [9, 0, 0, 0, 2, 0, 0, 0, 0]
+];
+
+let veryHardGrid = [
+    [0, 5, 0, 0, 0, 0, 4, 0, 0],
+    [1, 6, 0, 8, 0, 0, 7, 0, 5],
+    [4, 0, 0, 0, 0, 0, 0, 2, 6],
+    [0, 4, 9, 0, 0, 0, 0, 0, 0],
+    [8, 0, 5, 6, 0, 0, 0, 0, 1],
+    [0, 0, 0, 0, 0, 0, 8, 7, 0],
+    [0, 0, 0, 3, 9, 0, 0, 6, 4],
+    [0, 0, 0, 0, 0, 6, 0, 1, 0],
+    [9, 0, 0, 0, 2, 0, 0, 0, 0]
+];
+
 
 // TODO: use ESLint to check for missing semicolons
 // TODO: make sure functions using firstEmptySquare will still work if firstEmptySquare returns false
@@ -245,49 +294,46 @@ const sleep = (milliseconds) => {
     return new Promise(resolve => setTimeout(resolve, milliseconds))
 }
 
-function solveGrid(grid, squareOfInterest = firstEmptySquare(grid), previousMoves = [], makeChange = false) {
+/**
+ * I made a different version of this function that does not need recursion, which eliminates the risk of exceeding the maximum call stack size.
+ * @param {*} grid 
+ * @param {*} squareOfInterest 
+ * @param {*} previousMoves 
+ * @param {*} makeChange 
+ */
+/* function solveGrid(grid, squareOfInterest = firstEmptySquare(grid), previousMoves = [], makeChange = false) {
+    runCount++;
+    if (runCount % 1000 === 0) {
+        console.log(runCount);
+    }
     // sleep(100).then(()=>{
     drawSudokuGrid(grid);
     let newGrid = copyGrid(grid);
     let newPreviousMoves = copy2DArray(previousMoves);
     let currentRow = squareOfInterest[0];
     let currentCol = squareOfInterest[1];
-    const status = gridStatus(newGrid);
+    let status = gridStatus(newGrid);
     // console.log(status);
     if (status === "complete") {
         // console.log(newGrid);
         return newGrid;
     }
-    else if (makeChange) {
-        if (newGrid[currentRow][currentCol] < 9) {
+    else if (makeChange || status === "invalid") {
+        while (newGrid[currentRow][currentCol] < 9) {
             newGrid[currentRow][currentCol]++;
-            return solveGrid(newGrid, [currentRow, currentCol], newPreviousMoves);
-        }
-        else {
-            newGrid[currentRow][currentCol] = 0;
-            let temp = newPreviousMoves.pop(); // TODO: change variable name
-            if (temp === undefined) {
-                return false;
+            status = gridStatus(newGrid);
+            if (status !== "invalid") {
+                return solveGrid(newGrid, [currentRow, currentCol], newPreviousMoves);
             }
-            let newSquareOfInterest = [temp[0], temp[1]];
-            return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves, true);
         }
-    }
-    else if (status === "invalid") {
-        if (newGrid[currentRow][currentCol] < 9) {
-            newGrid[currentRow][currentCol]++;
-            return solveGrid(newGrid, [currentRow, currentCol], newPreviousMoves);
+        newGrid[currentRow][currentCol] = 0;
+        let lastMoveInList = newPreviousMoves.pop();
+        if (lastMoveInList === undefined) {
+            console.log("this sudoku is impossible");
+            return false;
         }
-        else {
-            newGrid[currentRow][currentCol] = 0;
-            let temp = newPreviousMoves.pop();
-            if (temp === undefined) {
-                console.log("this sudoku is impossible");
-                return false;
-            }
-            let newSquareOfInterest = [temp[0], temp[1]];
-            return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves, true);
-        }
+        let newSquareOfInterest = [lastMoveInList[0], lastMoveInList[1]];
+        return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves, true);
     }
     else if (status === "incomplete") {
         if (newGrid[currentRow][currentCol] === 0) {
@@ -302,11 +348,106 @@ function solveGrid(grid, squareOfInterest = firstEmptySquare(grid), previousMove
         }
     }
     // });
+} */
+
+function solveStep(grid, squareOfInterest = firstEmptySquare(grid), previousMoves = [], makeChange = false) {
+    drawSudokuGrid(grid);
+    let newGrid = copyGrid(grid);
+    let newPreviousMoves = copy2DArray(previousMoves);
+    let currentRow = squareOfInterest[0];
+    let currentCol = squareOfInterest[1];
+    let status = gridStatus(newGrid);
+    // console.log(status);
+    if (status === "complete") {
+        // console.log(newGrid);
+        return {
+            grid: newGrid,
+            squareOfInterest: null,
+            previousMoves: null,
+            makeChange: false,
+            done: true
+        };
+    }
+    else if (makeChange || status === "invalid") {
+        while (newGrid[currentRow][currentCol] < 9) {
+            newGrid[currentRow][currentCol]++;
+            status = gridStatus(newGrid);
+            if (status !== "invalid") {
+                // return solveGrid(newGrid, [currentRow, currentCol], newPreviousMoves);
+                return {
+                    grid: newGrid,
+                    squareOfInterest: [currentRow, currentCol],
+                    previousMoves: newPreviousMoves,
+                    makeChange: false,
+                    done: false
+                };
+            }
+        }
+        newGrid[currentRow][currentCol] = 0;
+        let lastMoveInList = newPreviousMoves.pop();
+        if (lastMoveInList === undefined) {
+            console.log("this sudoku is impossible");
+            return false;
+        }
+        let newSquareOfInterest = [lastMoveInList[0], lastMoveInList[1]];
+        // return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves, true);
+        return {
+            grid: newGrid,
+            squareOfInterest: newSquareOfInterest,
+            previousMoves: newPreviousMoves,
+            makeChange: true,
+            done: false
+        };
+    }
+    else if (status === "incomplete") {
+        if (newGrid[currentRow][currentCol] === 0) {
+            newGrid[currentRow][currentCol]++;
+            // return solveGrid(newGrid, [currentRow, currentCol], newPreviousMoves);
+            return {
+                grid: newGrid,
+                squareOfInterest: [currentRow, currentCol],
+                previousMoves: newPreviousMoves,
+                makeChange: false,
+                done: false
+            };
+        }
+        else {
+            // console.log("moving on to new square");
+            let newSquareOfInterest = firstEmptySquare(newGrid);
+            newPreviousMoves.push([currentRow, currentCol]);
+            // return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves);
+            return {
+                grid: newGrid,
+                squareOfInterest: newSquareOfInterest,
+                previousMoves: newPreviousMoves,
+                makeChange: false,
+                done: false
+            };
+        }
+    }
 }
 
-let currentGrid = testGrid;
+function solveGridNoRecursion(grid, squareOfInterest = firstEmptySquare(grid), previousMoves = [], makeChange = false){
+    let currentState = {
+        grid: grid,
+        squareOfInterest: squareOfInterest,
+        previousMoves: previousMoves,
+        makeChange: false,
+        done: false
+    };
+    do {
+        runCount ++;
+        currentState = solveStep(currentState.grid, currentState.squareOfInterest, currentState.previousMoves, currentState.makeChange)
+    } while (currentState.done === false);
+    console.log(`Iterations: ${runCount}`);
+    return currentState.grid;
+}
+
+
+let runCount = 0;
+let currentGrid = testGrid2;
 drawSudokuGrid(currentGrid);
-solveGrid(currentGrid);
+solveGridNoRecursion(currentGrid);
 
 // function programLoop() {
 //     drawSudokuGrid(currentGrid);
