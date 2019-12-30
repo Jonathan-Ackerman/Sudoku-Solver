@@ -1,0 +1,19 @@
+canvas {
+    width: 540px;
+    height: 540px;
+    border: 1px solid;
+}
+
+button {
+    width: 250px;
+    height: 30px;
+    margin-bottom: 10px;
+}
+
+.row {
+    display: flex;
+}
+
+.column {
+    flex: 50%;
+}

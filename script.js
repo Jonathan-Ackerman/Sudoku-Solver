@@ -1,11 +1,54 @@
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+const canvasStyle = getComputedStyle(canvas);
+const solveButtonFast = document.getElementById("solveButtonFast");
+const solveButtonSlow = document.getElementById("solveButton");
+const updateFrequencyIndicator = document.getElementById("updateFrequency");
+const resetButton = document.getElementById("resetButton");
+const clearFilledButton = document.getElementById("clearFilled");
+const premadePuzzleButton = document.getElementById("premadePuzzle");
+
 const width = canvas.width;
 const height = canvas.height;
+const styleWidth = parseInt(canvasStyle.width);
+const styleHeight = parseInt(canvasStyle.height);
 const squareWidth = width / 9;
 const squareHeight = height / 9;
+const defaultFont = "16px Arial";
+const boldFont = "bold 16px Arial";
+let updateFrequency = parseInt(updateFrequencyIndicator.nodeValue);
 
-ctx.font = "16px Arial";
+let mousePosObject = {
+    x: -100,
+    y: -100,
+    onCanvas: false,
+    gridX: function () {
+        if (this.onCanvas) {
+            return Math.floor(this.x / squareWidth);
+        }
+        return -1;
+    },
+    gridY: function () {
+        if (this.onCanvas) {
+            return Math.floor(this.y / squareHeight);
+        }
+        return -1;
+    }
+};
+
+let selectedSquare = {
+    row: -1,
+    column: -1,
+    reset: function () {
+        this.row = -1;
+        this.column = -1;
+    },
+    isActive: function () {
+        return !(this.row === -1 && this.column === -1);
+    }
+};
+
+ctx.font = defaultFont;
 
 let testGrid = [
     [0, 0, 9, 0, 1, 5, 7, 0, 8],
@@ -19,8 +62,7 @@ let testGrid = [
     [0, 0, 8, 0, 0, 0, 0, 6, 0]
 ];
 
-let testGrid2 = [
-    [0, 0, 0, 0, 0, 0, 0, 0, 8],
+let blank = [
     [0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -28,7 +70,8 @@ let testGrid2 = [
     [0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 8, 0, 0, 0, 0, 0, 0]
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0]
 ];
 
 let easyGrid = [
@@ -80,11 +123,28 @@ let veryHardGrid = [
 ];
 
 
+
+function genState(grid) {
+    return {
+        grid: copyGrid(grid),
+        squareOfInterest: firstEmptySquare(grid),
+        previousMoves: [],
+        makeChange: false,
+        invalid: gridStatus(grid) === "invalid",
+        done: gridStatus(grid) === "complete"
+    };
+}
+
+
 // TODO: use ESLint to check for missing semicolons
 // TODO: make sure functions using firstEmptySquare will still work if firstEmptySquare returns false
 // TODO: make sure everything still works if the initial state is already solved
 // TODO: implement formal unit testing
-// TODO: program exceeds maximum call stack size for hard puzzles
+// TODO: account for impossible puzzles
+// TODO: add way to halt slow solution
+// TODO: put all global variables in one place
+// TODO: reduce number of arguments for functions--make a standardized state class and use that
+// TODO: put in an error message in addition to the alert
 
 function zeros(rows, columns) {
     let zeroGrid = [];
@@ -98,6 +158,10 @@ function zeros(rows, columns) {
 }
 // console.log(zeros(2, 3));
 
+function blankGrid() {
+    return zeros(9, 9);
+}
+
 function copyGrid(grid) {
     let copy = zeros(9, 9);
     grid.forEach((row, rowNum) => {
@@ -108,6 +172,26 @@ function copyGrid(grid) {
     return copy;
 }
 // console.log(copyGrid(testGrid));
+
+function addGrids(grid1, grid2) {
+    let result = zeros(9, 9);
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            result[i][j] = grid1[i][j] + grid2[i][j];
+        }
+    }
+    return result;
+}
+
+function subtractGrids(grid1, grid2) {
+    let result = zeros(9, 9);
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            result[i][j] = grid1[i][j] - grid2[i][j];
+        }
+    }
+    return result;
+}
 
 function copyArray(arr) {
     let copy = [];
@@ -248,9 +332,10 @@ function drawGridLines() {
     }
 }
 
-function drawSudokuGrid(grid) {
-    ctx.clearRect(0, 0, width, height);
-    drawGridLines();
+function drawGridNumbers(grid, bold = false) {
+    if (bold) {
+        ctx.font = boldFont;
+    }
     const rowOffset = .6; // adjusts position of number so it is centered
     const colOffset = .45; // adjusts position of number so it is centered
     grid.forEach((row, rowNum) => {
@@ -260,6 +345,7 @@ function drawSudokuGrid(grid) {
             }
         });
     });
+    ctx.font = defaultFont;
 }
 
 /**
@@ -290,72 +376,14 @@ function makeGuess(grid, guess = 1) {
 }
 // console.log(makeGuess(testGrid));
 
-const sleep = (milliseconds) => {
-    return new Promise(resolve => setTimeout(resolve, milliseconds))
+function sleep(milliseconds) {
+    return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
-/**
- * I made a different version of this function that does not need recursion, which eliminates the risk of exceeding the maximum call stack size.
- * @param {*} grid 
- * @param {*} squareOfInterest 
- * @param {*} previousMoves 
- * @param {*} makeChange 
- */
-/* function solveGrid(grid, squareOfInterest = firstEmptySquare(grid), previousMoves = [], makeChange = false) {
-    runCount++;
-    if (runCount % 1000 === 0) {
-        console.log(runCount);
-    }
-    // sleep(100).then(()=>{
-    drawSudokuGrid(grid);
-    let newGrid = copyGrid(grid);
-    let newPreviousMoves = copy2DArray(previousMoves);
-    let currentRow = squareOfInterest[0];
-    let currentCol = squareOfInterest[1];
-    let status = gridStatus(newGrid);
-    // console.log(status);
-    if (status === "complete") {
-        // console.log(newGrid);
-        return newGrid;
-    }
-    else if (makeChange || status === "invalid") {
-        while (newGrid[currentRow][currentCol] < 9) {
-            newGrid[currentRow][currentCol]++;
-            status = gridStatus(newGrid);
-            if (status !== "invalid") {
-                return solveGrid(newGrid, [currentRow, currentCol], newPreviousMoves);
-            }
-        }
-        newGrid[currentRow][currentCol] = 0;
-        let lastMoveInList = newPreviousMoves.pop();
-        if (lastMoveInList === undefined) {
-            console.log("this sudoku is impossible");
-            return false;
-        }
-        let newSquareOfInterest = [lastMoveInList[0], lastMoveInList[1]];
-        return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves, true);
-    }
-    else if (status === "incomplete") {
-        if (newGrid[currentRow][currentCol] === 0) {
-            newGrid[currentRow][currentCol]++;
-            return solveGrid(newGrid, [currentRow, currentCol], newPreviousMoves);
-        }
-        else {
-            // console.log("moving on to new square");
-            let newSquareOfInterest = firstEmptySquare(newGrid);
-            newPreviousMoves.push([currentRow, currentCol]);
-            return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves);
-        }
-    }
-    // });
-} */
-
+// TODO: refactor to make the input an object
 function solveStep(grid, squareOfInterest = firstEmptySquare(grid), previousMoves = [], makeChange = false) {
-    drawSudokuGrid(grid);
+    // drawGridNumbers(grid);
     let newGrid = copyGrid(grid);
-    let newPreviousMoves = copy2DArray(previousMoves);
-    let currentRow = squareOfInterest[0];
-    let currentCol = squareOfInterest[1];
     let status = gridStatus(newGrid);
     // console.log(status);
     if (status === "complete") {
@@ -368,91 +396,268 @@ function solveStep(grid, squareOfInterest = firstEmptySquare(grid), previousMove
             done: true
         };
     }
-    else if (makeChange || status === "invalid") {
-        while (newGrid[currentRow][currentCol] < 9) {
-            newGrid[currentRow][currentCol]++;
-            status = gridStatus(newGrid);
-            if (status !== "invalid") {
+    else {
+        let newPreviousMoves = copy2DArray(previousMoves);
+        let currentRow = squareOfInterest[0];
+        let currentCol = squareOfInterest[1];
+        if (makeChange || status === "invalid") {
+            if (newGrid[currentRow][currentCol] < 9) {
+                newGrid[currentRow][currentCol]++;
+                status = gridStatus(newGrid);
+                return {
+                    grid: newGrid,
+                    squareOfInterest: [currentRow, currentCol],
+                    previousMoves: newPreviousMoves,
+                    makeChange: false,
+                    invalid: false,
+                    done: false
+                };
+            }
+            else {
+                newGrid[currentRow][currentCol] = 0;
+                let lastMoveInList = newPreviousMoves.pop();
+                if (lastMoveInList === undefined) {
+                    // alert("This sudoku has no solution");
+                    return { // TODO: change this return
+                        grid: newGrid,
+                        squareOfInterest: [currentRow, currentCol],
+                        previousMoves: newPreviousMoves,
+                        makeChange: false,
+                        invalid: true,
+                        done: false
+                    };
+                }
+                let newSquareOfInterest = [lastMoveInList[0], lastMoveInList[1]];
+                // return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves, true);
+                return {
+                    grid: newGrid,
+                    squareOfInterest: newSquareOfInterest,
+                    previousMoves: newPreviousMoves,
+                    makeChange: true,
+                    invalid: false,
+                    done: false
+                };
+            }
+        }
+        else if (status === "incomplete") {
+            if (newGrid[currentRow][currentCol] === 0) {
+                newGrid[currentRow][currentCol]++;
                 // return solveGrid(newGrid, [currentRow, currentCol], newPreviousMoves);
                 return {
                     grid: newGrid,
                     squareOfInterest: [currentRow, currentCol],
                     previousMoves: newPreviousMoves,
                     makeChange: false,
+                    invalid: false,
+                    done: false
+                };
+            }
+            else {
+                // console.log("moving on to new square");
+                let newSquareOfInterest = firstEmptySquare(newGrid);
+                newPreviousMoves.push([currentRow, currentCol]);
+                // return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves);
+                return {
+                    grid: newGrid,
+                    squareOfInterest: newSquareOfInterest,
+                    previousMoves: newPreviousMoves,
+                    makeChange: false,
+                    invalid: false,
                     done: false
                 };
             }
         }
-        newGrid[currentRow][currentCol] = 0;
-        let lastMoveInList = newPreviousMoves.pop();
-        if (lastMoveInList === undefined) {
-            console.log("this sudoku is impossible");
-            return false;
-        }
-        let newSquareOfInterest = [lastMoveInList[0], lastMoveInList[1]];
-        // return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves, true);
-        return {
-            grid: newGrid,
-            squareOfInterest: newSquareOfInterest,
-            previousMoves: newPreviousMoves,
-            makeChange: true,
-            done: false
-        };
     }
-    else if (status === "incomplete") {
-        if (newGrid[currentRow][currentCol] === 0) {
-            newGrid[currentRow][currentCol]++;
-            // return solveGrid(newGrid, [currentRow, currentCol], newPreviousMoves);
-            return {
-                grid: newGrid,
-                squareOfInterest: [currentRow, currentCol],
-                previousMoves: newPreviousMoves,
-                makeChange: false,
-                done: false
-            };
+}
+
+function solveGridNoRecursion(grid) {
+    let currentState = genState(grid);
+    do {
+        currentState = solveStep(currentState.grid, currentState.squareOfInterest, currentState.previousMoves, currentState.makeChange);
+    } while (currentState.done === false && !currentState.invalid);
+    // drawGridNumbers(currentState.grid);
+    if (currentState.done){
+        return currentState.grid;
+    }
+    else if (currentState.invalid){
+        console.log("no solution")
+        return null;
+    }
+}
+
+/**
+ * Changes a global variable called mousePosObject
+ * @param {*} e 
+ */
+function mouseMoveHandler(e) {
+    const canvasRect = canvas.getBoundingClientRect();
+    mousePosObject.x = (e.clientX - canvasRect.left) * width / styleWidth;
+    mousePosObject.y = (e.clientY - canvasRect.top) * height / styleHeight;
+    mousePosObject.onCanvas = ((mousePosObject.x <= width) && (mousePosObject.x >= 0) && (mousePosObject.y <= height) && (mousePosObject.y >= 0));
+}
+
+function clickHandler() {
+    if (mousePosObject.onCanvas) {
+        if ((mousePosObject.gridY() === selectedSquare.row) && (mousePosObject.gridX() === selectedSquare.column)) {
+            selectedSquare.reset();
         }
         else {
-            // console.log("moving on to new square");
-            let newSquareOfInterest = firstEmptySquare(newGrid);
-            newPreviousMoves.push([currentRow, currentCol]);
-            // return solveGrid(newGrid, newSquareOfInterest, newPreviousMoves);
-            return {
-                grid: newGrid,
-                squareOfInterest: newSquareOfInterest,
-                previousMoves: newPreviousMoves,
-                makeChange: false,
-                done: false
-            };
+            selectedSquare.row = mousePosObject.gridY();
+            selectedSquare.column = mousePosObject.gridX();
+        }
+    }
+    else {
+        selectedSquare.reset();
+    }
+}
+
+function keyDownHandler(e) {
+    const keyCode = e.keyCode;
+    if (keyCode >= 48 && keyCode <= 57) { // Numbers 0-9
+        const numberPressed = keyCode - 48;
+        if (canEdit && selectedSquare.isActive()) {
+            initialGrid[selectedSquare.row][selectedSquare.column] = numberPressed;
+            currentState = genState(blankGrid());
+            solveFast = false; // TODO: combine this case with the one below
+            solveSlow = false;
+        }
+    }
+    else if (keyCode === 8) { // Backspace
+        if (canEdit && selectedSquare.isActive()) {
+            initialGrid[selectedSquare.row][selectedSquare.column] = 0;
+            currentState = genState(blankGrid());
+            solveFast = false;
+            solveSlow = false;
+        }
+    }
+    else if (keyCode === 37) { // left arrow
+        if (selectedSquare.column > 0) {
+            selectedSquare.column--;
+        }
+        else if (!selectedSquare.isActive()) {
+            selectedSquare.row = 8;
+            selectedSquare.column = 8;
+        }
+    }
+    else if (keyCode === 38) { // up arrow
+        if (selectedSquare.row > 0) {
+            selectedSquare.row--;
+        }
+        else if (!selectedSquare.isActive()) {
+            selectedSquare.row = 8;
+            selectedSquare.column = 8;
+        }
+    }
+    else if (keyCode === 39) { // right arrow
+        if (selectedSquare.column < 8 && selectedSquare.column !== -1) {
+            selectedSquare.column++;
+        }
+        else if (!selectedSquare.isActive()) {
+            selectedSquare.row = 0;
+            selectedSquare.column = 0;
+        }
+    }
+    else if (keyCode === 40) { // down arrow
+        if (selectedSquare.row < 8 && selectedSquare.column !== -1) {
+            selectedSquare.row++;
+        }
+        else if (!selectedSquare.isActive()) {
+            selectedSquare.row = 0;
+            selectedSquare.column = 0;
         }
     }
 }
 
-function solveGridNoRecursion(grid, squareOfInterest = firstEmptySquare(grid), previousMoves = [], makeChange = false){
-    let currentState = {
-        grid: grid,
-        squareOfInterest: squareOfInterest,
-        previousMoves: previousMoves,
-        makeChange: false,
-        done: false
-    };
-    do {
-        runCount ++;
-        currentState = solveStep(currentState.grid, currentState.squareOfInterest, currentState.previousMoves, currentState.makeChange)
-    } while (currentState.done === false);
-    console.log(`Iterations: ${runCount}`);
-    return currentState.grid;
+function programLoop() {
+    ctx.clearRect(0, 0, width, height);
+    loopCount++;
+    let framesPerUpdate = Math.floor(50 / parseInt(updateFrequencyIndicator.value));
+    drawGridLines();
+    if (selectedSquare.isActive()) {
+        ctx.fillStyle = "#d3d3d3";
+        ctx.fillRect(selectedSquare.column * squareWidth, selectedSquare.row * squareHeight, squareWidth, squareHeight);
+        ctx.fillStyle = "black";
+    }
+    drawGridNumbers(initialGrid, true);
+    if (solveSlow) {
+        drawGridNumbers(subtractGrids(currentState.grid, initialGrid));
+        if (loopCount % framesPerUpdate === 0) {
+            if (!currentState.done && !currentState.invalid) {
+                currentState = solveStep(currentState.grid, currentState.squareOfInterest, currentState.previousMoves, currentState.makeChange);
+            }
+            else if (currentState.done) {
+                canEdit = true;
+            }
+            else if (currentState.invalid){
+                alert("This sudoku has no solution");
+                solveFast = false;
+                solveSlow = false;
+                canEdit = true;
+                currentState = genState(blankGrid());
+            }
+        }
+    }
+    if (solveFast) {
+        drawGridNumbers(subtractGrids(currentState.grid, initialGrid));
+    }
 }
 
+let initialGrid = zeros(9, 9);
+let filledNumbers = zeros(9, 9);
 
-let runCount = 0;
-let currentGrid = testGrid2;
-drawSudokuGrid(currentGrid);
-solveGridNoRecursion(currentGrid);
+let loopCount = 0;
+let solveFast = false;
+let solveSlow = false;
+let canEdit = true;
+let currentState = genState(blankGrid());
+const preMadePuzzles = [easyGrid, mediumGrid, hardGrid];
+let puzzleChoice = 0;
 
-// function programLoop() {
-//     drawSudokuGrid(currentGrid);
-// }
+document.addEventListener("mousemove", mouseMoveHandler);
+document.addEventListener("click", clickHandler)
+document.addEventListener("keydown", keyDownHandler);
+solveButtonSlow.addEventListener("click", () => {
+    solveFast = false;
+    solveSlow = true;
+    canEdit = false;
+    currentState = genState(initialGrid);
+});
+solveButtonFast.addEventListener("click", () => {
+    solveSlow = false;
+    solveFast = true;
+    let fastSolution = solveGridNoRecursion(initialGrid);
+    if (fastSolution !== null){
+        currentState = genState(fastSolution);
+    }
+    else{
+        alert("This sudoku has no solution");
+        solveFast = false;
+        currentState = genState(blankGrid());
+    }
+    canEdit = true;
+});
+resetButton.addEventListener("click", () => {
+    solveFast = false;
+    solveSlow = false;
+    canEdit = true;
+    initialGrid = blankGrid();
+    currentState = genState(blankGrid());
+});
+clearFilledButton.addEventListener("click", () => {
+    solveFast = false;
+    solveSlow = false;
+    canEdit = true; // TODO: make a function for resetting stuff to avoid repeat code
+    currentState = genState(blankGrid());
+});
+premadePuzzleButton.addEventListener("click", ()=>{
+    canEdit = true;
+    initialGrid = preMadePuzzles[puzzleChoice];
+    currentState = genState(blankGrid());
+    solveFast = false;
+    solveSlow = false;
+    puzzleChoice = (puzzleChoice + 1) % preMadePuzzles.length;
+});
 
-//console.log(solveGrid(currentGrid));
+initialGrid = blankGrid();
 
-// setInterval(programLoop, 500);
+setInterval(programLoop, 20);

@@ -1,13 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Sudoku Solver</title>
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    <canvas id = "canvas" width = "540" height = "540" style = "width: 500px; height: 500px; border: 1px solid"></canvas>
-    <script src = "script.js"></script>
+    <div class="row">
+        <div class="column">
+            <canvas id="canvas" width="540" height="540"></canvas>
+        </div>
+        <div class="column">
+            <h3>Instructions</h3>
+            <ul>
+                <li>Select a square by clicking on it or using the arrow keys</li>
+                <li>Type a number from 1 to 9 in the selected square</li>
+                <li>Use the backspace key to delete the current value in the square</li>
+                <li>When the puzzle is ready, use the buttons below the puzzle grid to solve</li>
+                <li>You can also input a pre-made puzzle using the corresponding button</li>
+            </ul>
+            <h3>Control Buttons</h3>
+            <button id="solveButton">Solve Puzzle (Show Intermediate Steps)</button>
+            <span>Solve Speed</span>
+            <input type="number" id="updateFrequency" min="1" max="50" value="5">
+            <br>
+            <button id="solveButtonFast">Solve Puzzle (Don't Show Intermediate Steps)</button>
+            <br>
+            <button id="resetButton">Clear All Values</button>
+            <br>
+            <button id="clearFilled">Clear Solved Values</button>
+            <br>
+            <button id="premadePuzzle">Load Premade Puzzle</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
+
 </html>
