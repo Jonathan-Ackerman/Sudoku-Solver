@@ -135,17 +135,6 @@ function genState(grid) {
     };
 }
 
-
-// TODO: use ESLint to check for missing semicolons
-// TODO: make sure functions using firstEmptySquare will still work if firstEmptySquare returns false
-// TODO: make sure everything still works if the initial state is already solved
-// TODO: implement formal unit testing
-// TODO: account for impossible puzzles
-// TODO: add way to halt slow solution
-// TODO: put all global variables in one place
-// TODO: reduce number of arguments for functions--make a standardized state class and use that
-// TODO: put in an error message in addition to the alert
-
 function zeros(rows, columns) {
     let zeroGrid = [];
     for (let i = 0; i < rows; i++) {
@@ -334,6 +323,7 @@ function drawGridLines() {
 
 function drawGridNumbers(grid, bold = false) {
     if (bold) {
+        ctx.fillStyle = "blue";
         ctx.font = boldFont;
     }
     const rowOffset = .6; // adjusts position of number so it is centered
@@ -346,6 +336,7 @@ function drawGridNumbers(grid, bold = false) {
         });
     });
     ctx.font = defaultFont;
+    ctx.fillStyle = "black";
 }
 
 /**
@@ -374,13 +365,7 @@ function makeGuess(grid, guess = 1) {
         column: guessSquare[1]
     };
 }
-// console.log(makeGuess(testGrid));
 
-function sleep(milliseconds) {
-    return new Promise(resolve => setTimeout(resolve, milliseconds));
-}
-
-// TODO: refactor to make the input an object
 function solveStep(grid, squareOfInterest = firstEmptySquare(grid), previousMoves = [], makeChange = false) {
     // drawGridNumbers(grid);
     let newGrid = copyGrid(grid);
@@ -418,7 +403,7 @@ function solveStep(grid, squareOfInterest = firstEmptySquare(grid), previousMove
                 let lastMoveInList = newPreviousMoves.pop();
                 if (lastMoveInList === undefined) {
                     // alert("This sudoku has no solution");
-                    return { // TODO: change this return
+                    return {
                         grid: newGrid,
                         squareOfInterest: [currentRow, currentCol],
                         previousMoves: newPreviousMoves,
@@ -518,7 +503,7 @@ function keyDownHandler(e) {
         if (canEdit && selectedSquare.isActive()) {
             initialGrid[selectedSquare.row][selectedSquare.column] = numberPressed;
             currentState = genState(blankGrid());
-            solveFast = false; // TODO: combine this case with the one below
+            solveFast = false;
             solveSlow = false;
         }
     }
@@ -571,7 +556,7 @@ function keyDownHandler(e) {
 function programLoop() {
     ctx.clearRect(0, 0, width, height);
     loopCount++;
-    let framesPerUpdate = Math.floor(50 / parseInt(updateFrequencyIndicator.value));
+    let framesPerUpdate = Math.floor(50 / parseInt(Math.min(updateFrequencyIndicator.value, 50)));
     drawGridLines();
     if (selectedSquare.isActive()) {
         ctx.fillStyle = "#d3d3d3";
@@ -646,7 +631,7 @@ resetButton.addEventListener("click", () => {
 clearFilledButton.addEventListener("click", () => {
     solveFast = false;
     solveSlow = false;
-    canEdit = true; // TODO: make a function for resetting stuff to avoid repeat code
+    canEdit = true;
     currentState = genState(blankGrid());
 });
 premadePuzzleButton.addEventListener("click", ()=>{
